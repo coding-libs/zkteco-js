@@ -1,0 +1,41 @@
+{
+  "name": "zkteco-js",
+  "version": "1.0.0",
+  "description": "The zkteco library allows Node.js developers to easily interface with ZK BioMetric Fingerprint Attendance Devices, extract and manage data, and integrate biometric features into attendance systems efficiently.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coding-libs/zkteco-js.git"
+  },
+  "keywords": [
+    "ip",
+    "libs",
+    "coding",
+    "device",
+    "zkteco",
+    "address",
+    "realtime",
+    "realtime",
+    "real-time",
+    "biometric",
+    "atendance",
+    "zkteco-js",
+    "biometric attendance",
+    "biometric attendance device"
+  ],
+  "author": "Coding Libs",
+  "license": "MIT",
+  "contributors": [
+    "Coding Libs <codinglibs4u@gmail.com>"
+  ],
+  "bugs": {
+    "url": "https://github.com/coding-libs/zkteco-js/issues"
+  },
+  "homepage": "https://github.com/coding-libs/zkteco-js#readme",
+  "directories": {
+    "test": "tests"
+  }
+}
