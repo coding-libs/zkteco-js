@@ -1,6 +1,13 @@
 <p align="center"><a href="https://www.zkteco.com/" target="_blank"><img src="https://raw.githubusercontent.com/coding-libs/zkteco-js/master/logo.jpg" width="400" alt="Zkteco Logo"></a></p>
 
-<h1> About zkteco-js </h1>
+
+## <span style="color:red;">Warning</span>
+
+**⚠️ This repository is not recommended for use in production. ⚠️**
+
+This repository is currently in development and may contain bugs or incomplete features. Use at your own risk and do not deploy to a production environment.
+
+# About zkteco-js
 The zkteco-js library provides a robust solution for Node.js developers to interface with ZK BioMetric Fingerprint Attendance Devices. Its user-friendly API allows seamless extraction of data, such as registered users, logs, and device versions. Developers can also add users, retrieve real-time logs, and clear attendance records. Using a socket connection, the library ensures fast and reliable data exchange. Whether creating an attendance system or a time-and-attendance management application, zkteco-js is the essential tool for integrating biometric devices efficiently.
 
 ### Installation
