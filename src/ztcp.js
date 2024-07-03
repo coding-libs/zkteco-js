@@ -436,7 +436,7 @@ class ZTCP {
         const RECORD_PACKET_SIZE = 40
 
         let recordData = data.data.subarray(4)
-        let records = []
+        const records = []
         while (recordData.length >= RECORD_PACKET_SIZE) {
             const record = decodeRecordData40(recordData.subarray(0, RECORD_PACKET_SIZE))
             records.push({...record, ip: this.ip})
@@ -445,6 +445,48 @@ class ZTCP {
 
         return {data: records}
 
+    }
+
+    async getRawAttendLog(callbackInProcess = () => {}) {
+
+        if (this.socket) {
+            try {
+                await this.freeData()
+            } catch (err) {
+                return Promise.reject(err)
+            }
+        }
+
+        let data = null
+        try {
+            data = await this.readWithBuffer(REQUEST_DATA.GET_ATTENDANCE_LOGS, callbackInProcess);
+        } catch (err) {
+            return Promise.reject(err)
+        }
+
+        if (this.socket) {
+            try {
+                await this.freeData()
+            } catch (err) {
+                return Promise.reject(err)
+            }
+        }
+
+        let recordData = data.data.subarray(4);
+
+        return recordData;
+    }
+
+    async readAttendLogs(recordData){
+        const RECORD_PACKET_SIZE = 40
+        const records = []
+        while (recordData.length >= RECORD_PACKET_SIZE) {
+            const record = decodeRecordData40(recordData.subarray(0, RECORD_PACKET_SIZE))
+            records.push({...record, ip: this.ip})
+            recordData = recordData.subarray(RECORD_PACKET_SIZE)
+        }
+
+        return records;
     }
 
     async freeData() {

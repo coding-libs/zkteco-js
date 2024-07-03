@@ -230,6 +230,20 @@ class ZktecoJs {
         )
     }
 
+    async getRawAttendLog(cb) {
+        return await this.functionWrapper(
+            () => this.ztcp.getRawAttendLog(cb),
+            () => this.zudp.getRawAttendLog(cb),
+        )
+    }
+
+    async readAttendLogs(cb) {
+        return await this.functionWrapper(
+            () => this.ztcp.readAttendLogs(cb),
+            () => this.zudp.readAttendLogs(cb),
+        )
+    }
+
     async getRealTimeLogs(cb) {
         return await this.functionWrapper(
             () => this.ztcp.getRealTimeLogs(cb),

@@ -60,10 +60,12 @@ manageZktecoDevice();
 - `getUsers()` - Retrieves an array of all users stored on the device.
 - `setUser(uid, userid, name, password, role = 0, cardno = 0)` - Adds a new user to the device.
 - `getAttendances()` - Retrieves an array of all attendance logs from the device.
+- <span style="color: green; font-weight: bold;">🆕 `getRawAttendLog()` - Retrieves raw attendances log from the device.</span>
+- <span style="color: green; font-weight: bold;">🆕 `readAttendLogs(rawLogs)`- Read raw attendances logs to an array.</span>
 - `getRealTimeLogs(callback)` - Sets up a real-time log stream and calls the provided callback function with each new log entry.
 - `getPIN()` - Retrieves the device PIN.
 - `getTime()` - Retrieves the current time from the device.
-- `setTime(DateTime)` - Updates the device's time.
+- <span style="color: green; font-weight: bold;">🆕 `setTime(DateTime)` - Updates the device's time.</span>
 - `getFaceOn()` - Checks if the device's Face On feature is enabled.
 - `getSSR()` - Retrieves the device's Self-Service Recorder (SSR) status.
 - `getDeviceVersion()` - Retrieves the device's firmware version.

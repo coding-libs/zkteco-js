@@ -3,8 +3,6 @@
  * Author: coding-libs
  * Date: 2024-07-01
  */
-
-
 const dgram = require('dgram')
 const {
     createUDPHeader,
@@ -18,7 +16,7 @@ const {
 
 const {MAX_CHUNK, REQUEST_DATA, COMMANDS} = require('./helper/command')
 
-const {log} = require('./logs/log')
+const { log } = require('./logs/log')
 const timeParser = require("./helper/time");
 
 class ZUDP {
@@ -405,7 +403,7 @@ class ZUDP {
             const RECORD_PACKET_SIZE = 16
             let recordData = data.data.subarray(4)
 
-            let records = []
+            const records = []
             while (recordData.length >= RECORD_PACKET_SIZE) {
                 const record = decodeRecordData16(recordData.subarray(0, RECORD_PACKET_SIZE))
                 records.push({...record, ip: this.ip})
@@ -415,6 +413,48 @@ class ZUDP {
             return {data: records, err: data.err}
         }
 
+    }
+
+    async getRawAttendLog(callbackInProcess = () => {}) {
+
+        if (this.socket) {
+            try {
+                await this.freeData()
+            } catch (err) {
+                return Promise.reject(err)
+            }
+        }
+
+        let data = null
+        try {
+            data = await this.readWithBuffer(REQUEST_DATA.GET_ATTENDANCE_LOGS, callbackInProcess)
+        } catch (err) {
+            return Promise.reject(err)
+        }
+
+        if (this.socket) {
+            try {
+                await this.freeData()
+            } catch (err) {
+                return Promise.reject(err)
+            }
+        }
+
+        let recordData = data.data.subarray(4);
+
+        return recordData;
+    }
+
+    async readAttendLogs(recordData){
+        const RECORD_PACKET_SIZE = 16
+        const records = []
+        while (recordData.length >= RECORD_PACKET_SIZE) {
+            const record = decodeRecordData16(recordData.subarray(0, RECORD_PACKET_SIZE))
+            records.push({...record, ip: this.ip})
+            recordData = recordData.subarray(RECORD_PACKET_SIZE)
+        }
+
+        return records;
     }
 
 
