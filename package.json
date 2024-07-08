@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "semantic-release": "semantic-release --branches master"
+    "semantic-release": "semantic-release --branches master",
+    "commit": "git-cz"
   },
   "repository": {
     "type": "git",
@@ -40,6 +41,12 @@
     "test": "tests"
   },
   "devDependencies": {
+    "cz-conventional-changelog": "^3.3.0",
     "semantic-release": "^24.0.0"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
   }
 }
