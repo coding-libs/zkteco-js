@@ -8,6 +8,7 @@
     "semantic-release": "semantic-release --branches master",
     "commit": "git-cz"
   },
+  "repositoryUrl": "https://github.com/coding-libs/zkteco-js.git",
   "repository": {
     "type": "git",
     "url": "https://github.com/coding-libs/zkteco-js.git"
