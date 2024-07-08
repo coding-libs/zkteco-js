@@ -217,6 +217,12 @@ class ZktecoJs {
         )
     }
 
+    async deleteUser(uid) {
+        return await this.functionWrapper(
+            () => this.ztcp.deleteUser(uid)
+        )
+    }
+
     async getAttendanceSize() {
         return await this.functionWrapper(
             () => this.ztcp.getAttendanceSize()

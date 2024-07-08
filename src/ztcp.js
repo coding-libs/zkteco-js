@@ -698,6 +698,16 @@ class ZTCP {
 
     }
 
+    async deleteUser(uid){
+        try {
+            const command_string = Buffer.alloc(72);
+            command_string.writeUInt16LE(uid, 0);
+            return await this.executeCmd(COMMANDS.CMD_DELETE_USER, command_string);
+        } catch (err) {
+            return Promise.reject(err);
+        }
+    }
+
     async getAttendanceSize() {
         try {
             const data = await this.executeCmd(COMMANDS.CMD_GET_FREE_SIZES, '')
