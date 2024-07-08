@@ -325,8 +325,7 @@ class ZktecoJs {
     setTimerSchedule(cb, timer) {
         this.timer = setTimeout(cb, timer)
     }
-
-
+    
 }
 
 
