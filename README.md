@@ -59,7 +59,7 @@ manageZktecoDevice();
 - `getInfo()` - Provides general information about the device, including log capacity and user count.
 - `getUsers()` - Retrieves an array of all users stored on the device.
 - `setUser(uid, userid, name, password, role = 0, cardno = 0)` - Adds a new user to the device.
-- <span style="color: green; font-weight: bold;">🆕 `deleteUser(uid)` - Delete a new user from the device.</span>
+- <span style="color: green; font-weight: bold;">🆕 `deleteUser(uid)` - Delete an user from the device.</span>
 - `getAttendances()` - Retrieves an array of all attendance logs from the device.
 - <span style="color: green; font-weight: bold;">🆕 `getRawAttendLog()` - Retrieves raw attendances log from the device.</span>
 - <span style="color: green; font-weight: bold;">🆕 `readAttendLogs(rawLogs)`- Read raw attendances logs to an array.</span>
