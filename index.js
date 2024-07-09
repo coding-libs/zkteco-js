@@ -310,6 +310,13 @@ class ZktecoJs {
         )
     }
 
+    async clearData() {
+        return await this.functionWrapper(
+            () => this.ztcp.clearData(),
+            () => this.zudp.clearData()
+        )
+    }
+
     async executeCmd(command, data = '') {
         return await this.functionWrapper(
             () => this.ztcp.executeCmd(command, data),
@@ -325,7 +332,7 @@ class ZktecoJs {
     setTimerSchedule(cb, timer) {
         this.timer = setTimeout(cb, timer)
     }
-    
+
 }
 
 

@@ -500,6 +500,10 @@ class ZUDP {
         return await this.executeCmd(COMMANDS.CMD_CLEAR_ATTLOG, '')
     }
 
+    async clearData() {
+        return await this.executeCmd(COMMANDS.CMD_CLEAR_DATA, '')
+    }
+
     async disableDevice() {
         return await this.executeCmd(COMMANDS.CMD_DISABLEDEVICE, REQUEST_DATA.DISABLE_DEVICE)
     }

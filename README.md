@@ -76,6 +76,7 @@ manageZktecoDevice();
 - `getAttendanceSize()` - Retrieves the total number of attendance records stored on the device.
 - `clearAttendanceLog()` - Clears all attendance logs from the device.
 - `disconnect()` - Disconnects the device from the network.
+- <span style="color: green; font-weight: bold;">🆕 `clearData()` - Clear All Data from the device (all users,attendances logs etc ).</span>
 
 ## Contributing
 

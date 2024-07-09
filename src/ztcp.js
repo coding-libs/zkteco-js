@@ -722,6 +722,10 @@ class ZTCP {
         return await this.executeCmd(COMMANDS.CMD_CLEAR_ATTLOG, '')
     }
 
+    async clearData() {
+        return await this.executeCmd(COMMANDS.CMD_CLEAR_DATA, '')
+    }
+
     async getRealTimeLogs(cb = () => {
     }) {
         this.replyId++;
