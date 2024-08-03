@@ -115,13 +115,21 @@ class ZTCP {
 
     writeMessage(msg, connect) {
         return new Promise((resolve, reject) => {
+            // Check if the socket is initialized
+            if (!this.socket) {
+                return reject(new Error('Socket is not initialized'));
+            }
+
             // Define a variable for the timeout reference
             let timer = null;
 
             // Handle incoming data
             const onData = (data) => {
+                // Check if the socket is still valid before trying to remove the listener
+                if (this.socket) {
+                    this.socket.removeListener('data', onData); // Remove the data event listener
+                }
                 clearTimeout(timer); // Clear the timeout once data is received
-                this.socket.removeListener('data', onData); // Remove the data event listener
                 resolve(data); // Resolve the promise with the received data
             };
 
@@ -131,14 +139,20 @@ class ZTCP {
             // Attempt to write the message to the socket
             this.socket.write(msg, null, (err) => {
                 if (err) {
-                    this.socket.removeListener('data', onData); // Clean up listener on write error
+                    // Check if the socket is still valid before trying to remove the listener
+                    if (this.socket) {
+                        this.socket.removeListener('data', onData); // Clean up listener on write error
+                    }
                     return reject(err); // Reject the promise with the write error
                 }
 
                 // If a timeout is set, configure it
                 if (this.timeout) {
                     timer = setTimeout(() => {
-                        this.socket.removeListener('data', onData); // Remove listener on timeout
+                        // Check if the socket is still valid before trying to remove the listener
+                        if (this.socket) {
+                            this.socket.removeListener('data', onData); // Remove listener on timeout
+                        }
                         reject(new Error('TIMEOUT_ON_WRITING_MESSAGE')); // Reject the promise on timeout
                     }, connect ? 2000 : this.timeout);
                 }
