@@ -61,8 +61,6 @@ manageZktecoDevice();
 - `setUser(uid, userid, name, password, role = 0, cardno = 0)` - Adds a new user to the device.
 - <span style="color: green; font-weight: bold;">🆕 `deleteUser(uid)` - Delete an user from the device.</span>
 - `getAttendances()` - Retrieves an array of all attendance logs from the device.
-- <span style="color: green; font-weight: bold;">🆕 `getRawAttendLog()` - Retrieves raw attendances log from the device.</span>
-- <span style="color: green; font-weight: bold;">🆕 `readAttendLogs(rawLogs)`- Read raw attendances logs to an array.</span>
 - `getRealTimeLogs(callback)` - Sets up a real-time log stream and calls the provided callback function with each new log entry.
 - `getPIN()` - Retrieves the device PIN.
 - `getTime()` - Retrieves the current time from the device.
@@ -77,6 +75,7 @@ manageZktecoDevice();
 - `clearAttendanceLog()` - Clears all attendance logs from the device.
 - `disconnect()` - Disconnects the device from the network.
 - <span style="color: green; font-weight: bold;">🆕 `clearData()` - Clear All Data from the device (all users,attendances logs etc ).</span>
+- <span style="color: green; font-weight: bold;">🆕 `voiceTest()` - Voice Test.</span>
 
 ## Contributing
 
