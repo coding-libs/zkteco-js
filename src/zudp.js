@@ -30,123 +30,178 @@ class ZUDP {
         this.inport = inport
     }
 
-    createSocket(cbError, cbClose) {
+
+    createSocket(cbError = null, cbClose = null) {
         return new Promise((resolve, reject) => {
             this.socket = dgram.createSocket('udp4');
-            this.socket.setMaxListeners(Infinity)
+            this.socket.setMaxListeners(Infinity); // Allow unlimited listeners
+
+            // Handle socket errors
             this.socket.once('error', err => {
-                reject(err)
-                cbError && cbError(err)
-            })
+                this.socket = null; // Clean up the socket reference
+                reject(err); // Reject the promise
+                if (cbError) cbError(err); // Call the error callback if provided
+            });
 
-            this.socket.on('close', (err) => {
-                this.socket = null;
-                cbClose && cbClose('udp')
-            })
+            // Handle socket close event
+            this.socket.once('close', () => {
+                this.socket = null; // Clean up the socket reference
+                if (cbClose) cbClose('udp'); // Call the close callback if provided
+            });
 
+            // Handle socket listening event
             this.socket.once('listening', () => {
-                resolve(this.socket)
-            })
-            try {
-                this.socket.bind(this.inport)
-            } catch (err) {
-            }
+                resolve(this.socket); // Resolve the promise with the socket
+            });
 
-        })
+            // Bind the socket to the specified port
+            try {
+                this.socket.bind(this.inport);
+            } catch (err) {
+                this.socket = null; // Clean up the socket reference
+                reject(err); // Reject the promise
+                if (cbError) cbError(err); // Call the error callback if provided
+            }
+        });
     }
 
-    connect() {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const reply = await this.executeCmd(COMMANDS.CMD_CONNECT, '')
-                if (reply) {
-                    resolve(true)
-                } else {
-                    reject(new Error('NO_REPLY_ON_CMD_CONNECT'))
-                }
-            } catch (err) {
-                reject(err)
+
+    async connect() {
+        try {
+            const reply = await this.executeCmd(COMMANDS.CMD_CONNECT, '');
+
+            if (reply) {
+                return true; // Resolve with true if the reply is valid
+            } else {
+                throw new Error('NO_REPLY_ON_CMD_CONNECT'); // Throw an error if no reply
             }
-        })
+        } catch (err) {
+            // Log the error for debugging purposes
+            console.error('Error in connect method:', err);
+            throw err; // Re-throw the error to be handled by the caller
+        }
     }
 
 
     closeSocket() {
         return new Promise((resolve, reject) => {
-            this.socket.removeAllListeners('message')
-            this.socket.close(() => {
-                clearTimeout(timer)
-                resolve(true)
-            })
+            // Ensure the socket exists and is properly handled
+            if (!this.socket) {
+                resolve(true);
+                return;
+            }
 
-            /**
-             * When socket isn't connected so this.socket.end will never resolve
-             * we use settimeout for handling this case
-             */
+            // Remove all listeners for the 'message' event
+            this.socket.removeAllListeners('message');
+
+            // Create a timeout to handle cases where the socket might not close in a timely manner
+            const timeout = 2000; // Timeout duration in milliseconds
             const timer = setTimeout(() => {
-                resolve(true)
-            }, 2000)
-        })
+                console.warn('Socket close timeout');
+                resolve(true);
+            }, timeout);
+
+            // Handle the socket close operation
+            this.socket.close((err) => {
+                // Clear the timer as socket is closing
+                clearTimeout(timer);
+
+                // Handle any potential errors during the closing process
+                if (err) {
+                    console.error('Error closing socket:', err);
+                    reject(err);
+                } else {
+                    resolve(true);
+                }
+
+                // Set the socket to null after closing
+                this.socket = null;
+            });
+        });
     }
+
 
     writeMessage(msg, connect) {
         return new Promise((resolve, reject) => {
             let sendTimeoutId;
-            this.socket.once('message', (data) => {
-                sendTimeoutId && clearTimeout(sendTimeoutId)
-                resolve(data)
-            })
 
+            // Setup a listener for the response message
+            const onMessage = (data) => {
+                clearTimeout(sendTimeoutId); // Clear timeout if message is received
+                this.socket.removeListener('message', onMessage); // Remove the listener
+                resolve(data); // Resolve the promise with the received data
+            };
+
+            this.socket.once('message', onMessage); // Use once to ensure single response
+
+            // Send the message
             this.socket.send(msg, 0, msg.length, this.port, this.ip, (err) => {
                 if (err) {
-                    reject(err)
+                    this.socket.removeListener('message', onMessage); // Clean up listener on error
+                    reject(err); // Reject the promise with the error
+                    return; // Exit early to avoid setting timeout on error
                 }
+
+                // Setup a timeout if a timeout duration is specified
                 if (this.timeout) {
                     sendTimeoutId = setTimeout(() => {
-                        clearTimeout(sendTimeoutId)
-                        reject(new Error('TIMEOUT_ON_WRITING_MESSAGE'))
-                    }, connect ? 2000 : this.timeout)
+                        this.socket.removeListener('message', onMessage); // Clean up listener on timeout
+                        reject(new Error('TIMEOUT_ON_WRITING_MESSAGE')); // Reject the promise on timeout
+                    }, connect ? 2000 : this.timeout);
                 }
-            })
-        })
+            });
+        });
     }
 
     requestData(msg) {
         return new Promise((resolve, reject) => {
-            let sendTimeoutId
-            const internalCallback = (data) => {
-                sendTimeoutId && clearTimeout(sendTimeoutId)
-                this.socket.removeListener('message', handleOnData)
-                resolve(data)
-            }
+            let sendTimeoutId;
+            let responseTimeoutId;
 
+            // Define the callback to handle incoming data
             const handleOnData = (data) => {
-                if (checkNotEventUDP(data)) return;
-                clearTimeout(sendTimeoutId)
-                sendTimeoutId = setTimeout(() => {
-                    reject(new Error('TIMEOUT_ON_RECEIVING_REQUEST_DATA'))
-                }, this.timeout)
+                if (checkNotEventUDP(data)) return; // Filter out unwanted data
 
-                if (data.length >= 13) {
-                    internalCallback(data)
-                }
+                // Clear any existing timeouts
+                clearTimeout(sendTimeoutId);
+                clearTimeout(responseTimeoutId);
 
-            }
+                // Remove the event listener for 'message'
+                this.socket.removeListener('message', handleOnData);
 
-            this.socket.on('message', handleOnData)
+                // Resolve the promise with the received data
+                resolve(data);
+            };
 
+            // Define the timeout callback for handling the receive timeout
+            const onReceiveTimeout = () => {
+                this.socket.removeListener('message', handleOnData);
+                reject(new Error('TIMEOUT_ON_RECEIVING_REQUEST_DATA'));
+            };
+
+            // Attach the data event listener
+            this.socket.on('message', handleOnData);
+
+            // Send the message
             this.socket.send(msg, 0, msg.length, this.port, this.ip, (err) => {
                 if (err) {
-                    reject(err)
+                    this.socket.removeListener('message', handleOnData); // Clean up listener on error
+                    reject(err);
+                    return;
                 }
-                sendTimeoutId = setTimeout(() => {
-                    reject(Error('TIMEOUT_IN_RECEIVING_RESPONSE_AFTER_REQUESTING_DATA'))
-                }, this.timeout)
 
-            })
-        })
+                // Set up the timeout for receiving a response
+                responseTimeoutId = setTimeout(onReceiveTimeout, this.timeout);
+            });
 
+            // Set up the timeout for sending the message
+            sendTimeoutId = setTimeout(() => {
+                this.socket.removeListener('message', handleOnData);
+                reject(new Error('TIMEOUT_IN_RECEIVING_RESPONSE_AFTER_REQUESTING_DATA'));
+            }, this.timeout);
+        });
     }
+
 
     /**
      *
@@ -156,46 +211,64 @@ class ZUDP {
      *
      * reject error when command fail and resolve data when success
      */
-    executeCmd(command, data) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                if (command === COMMANDS.CMD_CONNECT) {
-                    this.sessionId = 0
-                    this.replyId = 0
-                } else {
-                    this.replyId++
-                }
-
-                const buf = createUDPHeader(command, this.sessionId, this.replyId, data)
-                const reply = await this.writeMessage(buf, command === COMMANDS.CMD_CONNECT || command === COMMANDS.CMD_EXIT)
-
-                if (reply && reply.length && reply.length >= 0) {
-                    if (command === COMMANDS.CMD_CONNECT) {
-                        this.sessionId = reply.readUInt16LE(4);
-                    }
-                }
-                resolve(reply)
-            } catch (err) {
-                reject(err)
+    async executeCmd(command, data) {
+        try {
+            // Handle command-specific logic
+            if (command === COMMANDS.CMD_CONNECT) {
+                this.sessionId = 0;
+                this.replyId = 0;
+            } else {
+                this.replyId++;
             }
-        })
+
+            // Create and send the UDP packet
+            const buf = createUDPHeader(command, this.sessionId, this.replyId, data);
+            const reply = await this.writeMessage(buf, command === COMMANDS.CMD_CONNECT || command === COMMANDS.CMD_EXIT);
+
+            // Process the reply if necessary
+            if (reply && reply.length > 0) { // Check if reply is not empty
+                if (command === COMMANDS.CMD_CONNECT) {
+                    this.sessionId = reply.readUInt16LE(4);
+                }
+            }
+
+            // Return the reply
+            return reply;
+
+        } catch (err) {
+            // Handle errors by logging or throwing them
+            console.error(`Error executing command ${command}:`, err);
+            throw err;
+        }
     }
 
 
-    sendChunkRequest(start, size) {
+    async sendChunkRequest(start, size) {
         this.replyId++;
-        const reqData = Buffer.alloc(8)
-        reqData.writeUInt32LE(start, 0)
-        reqData.writeUInt32LE(size, 4)
-        const buf = createUDPHeader(COMMANDS.CMD_DATA_RDY, this.sessionId, this.replyId, reqData)
+        const reqData = Buffer.alloc(8);
+        reqData.writeUInt32LE(start, 0);
+        reqData.writeUInt32LE(size, 4);
+        const buf = createUDPHeader(COMMANDS.CMD_DATA_RDY, this.sessionId, this.replyId, reqData);
 
-        this.socket.send(buf, 0, buf.length, this.port, this.ip, (err) => {
-            if (err) {
-                if (err) {
-                    log(`[UDP][SEND_CHUNK_REQUEST]` + err.toString())
-                }
-            }
-        })
+        try {
+            await new Promise((resolve, reject) => {
+                // Send the buffer over UDP
+                this.socket.send(buf, 0, buf.length, this.port, this.ip, (err) => {
+                    if (err) {
+                        // Log the error and reject the promise
+                        log(`[UDP][SEND_CHUNK_REQUEST] Error sending chunk request: ${err.message}`);
+                        reject(err);
+                    } else {
+                        // Resolve the promise if sending was successful
+                        resolve();
+                    }
+                });
+            });
+        } catch (error) {
+            // Log any exceptions that occur during the send operation
+            log(`[UDP][SEND_CHUNK_REQUEST] Exception: ${error.message}`);
+            throw error; // Re-throw the error if it needs to be handled further up
+        }
     }
 
 
@@ -207,148 +280,123 @@ class ZUDP {
      * readWithBuffer will reject error if it'wrong when starting request data
      * readWithBuffer will return { data: replyData , err: Error } when receiving requested data
      */
-    readWithBuffer(reqData, cb = null) {
-        return new Promise(async (resolve, reject) => {
-            this.replyId++;
-            const buf = createUDPHeader(COMMANDS.CMD_DATA_WRRQ, this.sessionId, this.replyId, reqData)
+    async readWithBuffer(reqData, cb = null) {
+        this.replyId++;
+        const buf = createUDPHeader(COMMANDS.CMD_DATA_WRRQ, this.sessionId, this.replyId, reqData);
 
-
-            let reply = null
-            try {
-                reply = await this.requestData(buf)
-            } catch (err) {
-                reject(err)
-            }
-
-            const header = decodeUDPHeader(reply.subarray(0, 8))
+        try {
+            const reply = await this.requestData(buf);
+            const header = decodeUDPHeader(reply.subarray(0, 8));
 
             switch (header.commandId) {
-                case COMMANDS.CMD_DATA: {
-                    resolve({data: reply.subarray(8), mode: 8, err: null})
-                    break;
-                }
+                case COMMANDS.CMD_DATA:
+                    return { data: reply.subarray(8), mode: 8, err: null };
+
                 case COMMANDS.CMD_ACK_OK:
-                case COMMANDS.CMD_PREPARE_DATA: {
-                    // this case show that data is prepared => send command to get these data
-                    // reply variable includes information about the size of following data
-                    const recvData = reply.subarray(8)
-                    const size = recvData.readUIntLE(1, 4)
+                case COMMANDS.CMD_PREPARE_DATA:
+                    return await this.handleChunkedData(reply, header.commandId, cb);
 
-                    // We need to split the data to many chunks to receive , because it's to large
-                    // After receiving all chunk data , we concat it to TotalBuffer variable , that 's the data we want
-                    let remain = size % MAX_CHUNK
-                    let numberChunks = Math.round(size - remain) / MAX_CHUNK
-
-                    let totalBuffer = Buffer.from([])
-
-
-                    const timeout = 3000
-                    let timer = setTimeout(() => {
-                        internalCallback(totalBuffer, new Error('TIMEOUT WHEN RECEIVING PACKET'))
-                    }, timeout)
-
-
-                    const internalCallback = (replyData, err = null) => {
-                        this.socket.removeListener('message', handleOnData)
-                        timer && clearTimeout(timer)
-                        if (err) {
-                            resolve({err, data: replyData})
-                        } else {
-                            resolve({err: null, data: replyData})
-                        }
-                    }
-
-
-                    const handleOnData = (reply) => {
-                        if (checkNotEventUDP(reply)) return;
-                        clearTimeout(timer)
-                        timer = setTimeout(() => {
-                            internalCallback(totalBuffer, new Error(`TIMEOUT !! ${(size - totalBuffer.length) / size} % REMAIN !  `))
-                        }, timeout)
-                        const header = decodeUDPHeader(reply)
-
-                        switch (header.commandId) {
-                            case COMMANDS.CMD_PREPARE_DATA: {
-                                break;
-                            }
-                            case COMMANDS.CMD_DATA: {
-                                totalBuffer = Buffer.concat([totalBuffer, reply.subarray(8)])
-                                cb && cb(totalBuffer.length, size)
-                                break;
-                            }
-                            case COMMANDS.CMD_ACK_OK: {
-                                if (totalBuffer.length === size) {
-                                    internalCallback(totalBuffer)
-                                }
-                                break;
-                            }
-                            default: {
-                                internalCallback([], new Error('ERROR_IN_UNHANDLE_CMD ' + exportErrorMessage(header.commandId)))
-                            }
-                        }
-                    }
-
-                    this.socket.on('message', handleOnData);
-
-                    for (let i = 0; i <= numberChunks; i++) {
-                        if (i === numberChunks) {
-                            this.sendChunkRequest(numberChunks * MAX_CHUNK, remain)
-                        } else {
-                            this.sendChunkRequest(i * MAX_CHUNK, MAX_CHUNK)
-                        }
-                    }
-
-                    break;
-                }
-                default: {
-                    reject(new Error('ERROR_IN_UNHANDLE_CMD ' + exportErrorMessage(header.commandId)))
-                }
+                default:
+                    throw new Error('ERROR_IN_UNHANDLE_CMD ' + exportErrorMessage(header.commandId));
             }
-        })
+        } catch (err) {
+            return { err, data: null };
+        }
+    }
+
+    async handleChunkedData(reply, commandId, cb) {
+        const recvData = reply.subarray(8);
+        const size = recvData.readUIntLE(1, 4);
+        let totalBuffer = Buffer.from([]);
+        const timeout = 3000;
+
+        let timer = setTimeout(() => {
+            this.socket.removeListener('message', handleOnData);
+            throw new Error('TIMEOUT WHEN RECEIVING PACKET');
+        }, timeout);
+
+        const internalCallback = (replyData, err = null) => {
+            this.socket.removeListener('message', handleOnData);
+            clearTimeout(timer);
+            if (err) {
+                return { err, data: replyData };
+            }
+            return { err: null, data: replyData };
+        };
+
+        const handleOnData = (reply) => {
+            if (checkNotEventUDP(reply)) return;
+
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                internalCallback(totalBuffer, new Error(`TIMEOUT !! ${(size - totalBuffer.length) / size} % REMAIN !`));
+            }, timeout);
+
+            const header = decodeUDPHeader(reply);
+            switch (header.commandId) {
+                case COMMANDS.CMD_PREPARE_DATA:
+                    break;
+
+                case COMMANDS.CMD_DATA:
+                    totalBuffer = Buffer.concat([totalBuffer, reply.subarray(8)]);
+                    cb && cb(totalBuffer.length, size);
+                    break;
+
+                case COMMANDS.CMD_ACK_OK:
+                    if (totalBuffer.length === size) {
+                        internalCallback(totalBuffer);
+                    }
+                    break;
+
+                default:
+                    internalCallback([], new Error('ERROR_IN_UNHANDLE_CMD ' + exportErrorMessage(header.commandId)));
+            }
+        };
+
+        this.socket.on('message', handleOnData);
+
+        const chunkCount = Math.ceil(size / MAX_CHUNK);
+        for (let i = 0; i < chunkCount; i++) {
+            const start = i * MAX_CHUNK;
+            const chunkSize = (i === chunkCount - 1) ? size % MAX_CHUNK : MAX_CHUNK;
+            this.sendChunkRequest(start, chunkSize);
+        }
     }
 
 
     async getUsers() {
-
-        // Free Buffer Data to request Data
-        if (this.socket) {
-            try {
-                await this.freeData()
-            } catch (err) {
-                return Promise.reject(err)
-            }
-        }
-
-
-        let data = null
         try {
-            data = await this.readWithBuffer(REQUEST_DATA.GET_USERS)
-        } catch (err) {
-            return Promise.reject(err)
-        }
-
-        // Free Buffer Data after requesting data
-        if (this.socket) {
-            try {
-                await this.freeData()
-            } catch (err) {
-                return Promise.reject(err)
+            // Free Buffer Data to request Data
+            if (this.socket) {
+                await this.freeData();
             }
+
+            // Read user data from the buffer
+            const data = await this.readWithBuffer(REQUEST_DATA.GET_USERS);
+
+            // Free Buffer Data after requesting data
+            if (this.socket) {
+                await this.freeData();
+            }
+
+            const USER_PACKET_SIZE = 28;
+            let userData = data.data.subarray(4);
+            const users = [];
+
+            // Decode user data
+            while (userData.length >= USER_PACKET_SIZE) {
+                const user = decodeUserData28(userData.subarray(0, USER_PACKET_SIZE));
+                users.push(user);
+                userData = userData.subarray(USER_PACKET_SIZE);
+            }
+
+            return { data: users, err: data.err };
+        } catch (err) {
+            // Handle any errors that occurred
+            return { data: [], err };
         }
-
-        const USER_PACKET_SIZE = 28
-        let userData = data.data.subarray(4)
-        let users = []
-
-        while (userData.length >= USER_PACKET_SIZE) {
-            const user = decodeUserData28(userData.subarray(0, USER_PACKET_SIZE))
-            users.push(user)
-            userData = userData.subarray(USER_PACKET_SIZE)
-        }
-
-        return {data: users, err: data.err}
-
     }
+
 
 
     /**
@@ -358,187 +406,210 @@ class ZUDP {
      *  reject error when starting request data
      *  return { data: records, err: Error } when receiving requested data
      */
-
-
-    async getAttendances(callbackInProcess = () => {
-    }) {
-        if (this.socket) {
-            try {
-                await this.freeData()
-            } catch (err) {
-                return Promise.reject(err)
-            }
-        }
-
-        let data = null
+    async getAttendances(callbackInProcess = () => {}) {
         try {
-            data = await this.readWithBuffer(REQUEST_DATA.GET_ATTENDANCE_LOGS, callbackInProcess)
-        } catch (err) {
-            return Promise.reject(err)
-        }
-
-        if (this.socket) {
-            try {
-                await this.freeData()
-            } catch (err) {
-                return Promise.reject(err)
+            // Free Buffer Data before requesting new data
+            if (this.socket) {
+                await this.freeData();
             }
-        }
 
-        if (data.mode) {
-            // Data too small to decode in a normal way  => we need a parameter to indicate this case
-            const RECORD_PACKET_SIZE = 8
-            let recordData = data.data.subarray(4)
+            // Read attendance data
+            const data = await this.readWithBuffer(REQUEST_DATA.GET_ATTENDANCE_LOGS, callbackInProcess);
 
-            let records = []
+            // Free Buffer Data after requesting data
+            if (this.socket) {
+                await this.freeData();
+            }
+
+            const RECORD_PACKET_SIZE = data.mode ? 8 : 16;
+            let recordData = data.data.subarray(4);
+
+            // Process and decode record data
+            const records = [];
             while (recordData.length >= RECORD_PACKET_SIZE) {
-                const record = decodeRecordData16(recordData.subarray(0, RECORD_PACKET_SIZE))
-                records.push({...record, ip: this.ip})
-                recordData = recordData.subarray(RECORD_PACKET_SIZE)
+                const record = decodeRecordData16(recordData.subarray(0, RECORD_PACKET_SIZE));
+                records.push({ ...record, ip: this.ip });
+                recordData = recordData.subarray(RECORD_PACKET_SIZE);
             }
 
-            return {data: records, err: data.err}
-
-        } else {
-            const RECORD_PACKET_SIZE = 16
-            let recordData = data.data.subarray(4)
-
-            const records = []
-            while (recordData.length >= RECORD_PACKET_SIZE) {
-                const record = decodeRecordData16(recordData.subarray(0, RECORD_PACKET_SIZE))
-                records.push({...record, ip: this.ip})
-                recordData = recordData.subarray(RECORD_PACKET_SIZE)
-            }
-
-            return {data: records, err: data.err}
-        }
-
-    }
-
-    async getRawAttendLog(callbackInProcess = () => {}) {
-
-        if (this.socket) {
-            try {
-                await this.freeData()
-            } catch (err) {
-                return Promise.reject(err)
-            }
-        }
-
-        let data = null
-        try {
-            data = await this.readWithBuffer(REQUEST_DATA.GET_ATTENDANCE_LOGS, callbackInProcess)
+            return { data: records, err: data.err };
         } catch (err) {
-            return Promise.reject(err)
+            // Handle errors that occurred during the process
+            return { data: [], err };
         }
-
-        if (this.socket) {
-            try {
-                await this.freeData()
-            } catch (err) {
-                return Promise.reject(err)
-            }
-        }
-
-        let recordData = data.data.subarray(4);
-
-        return recordData;
     }
-
-    async readAttendLogs(recordData){
-        const RECORD_PACKET_SIZE = 16
-        const records = []
-        while (recordData.length >= RECORD_PACKET_SIZE) {
-            const record = decodeRecordData16(recordData.subarray(0, RECORD_PACKET_SIZE))
-            records.push({...record, ip: this.ip})
-            recordData = recordData.subarray(RECORD_PACKET_SIZE)
-        }
-
-        return records;
-    }
-
 
     async freeData() {
-        return await this.executeCmd(COMMANDS.CMD_FREE_DATA, '')
+        try {
+            // Send command to free data with an empty buffer
+            return await this.executeCmd(COMMANDS.CMD_FREE_DATA, Buffer.alloc(0));
+        } catch (err) {
+            // Handle errors and rethrow or log if necessary
+            console.error('Error freeing data:', err);
+            throw err; // Re-throw the error to propagate it
+        }
     }
 
-
     async getInfo() {
-        const data = await this.executeCmd(COMMANDS.CMD_GET_FREE_SIZES, '')
         try {
+            // Execute command to get free sizes
+            const data = await this.executeCmd(COMMANDS.CMD_GET_FREE_SIZES, Buffer.alloc(0));
+
+            // Parse the data
             return {
                 userCounts: data.readUIntLE(24, 4),
                 logCounts: data.readUIntLE(40, 4),
                 logCapacity: data.readUIntLE(72, 4)
-            }
+            };
         } catch (err) {
-            return Promise.reject(err)
+            // Handle and propagate any errors that occur
+            console.error('Error retrieving info:', err);
+            throw err; // Re-throw the error to allow it to be handled by the caller
         }
     }
+
 
     async getTime() {
         try {
-            const t = await this.executeCmd(COMMANDS.CMD_GET_TIME, '')
-            return timeParser.decode(t.readUInt32LE(8));
+            // Execute command to get time
+            const response = await this.executeCmd(COMMANDS.CMD_GET_TIME, Buffer.alloc(0));
+
+            // Parse and return the time
+            const timeValue = response.readUInt32LE(8);
+            return timeParser.decode(timeValue);
         } catch (err) {
-            return Promise.reject(err);
+            // Log and propagate the error
+            console.error('Error retrieving time:', err);
+            throw err; // Re-throw the error to be handled by the caller
         }
     }
+
 
     async setTime(tm) {
         try {
-            const command_string = Buffer.alloc(32);
-            command_string.writeUInt32LE(timeParser.encode(new Date(tm)));
-            await this.executeCmd(COMMANDS.CMD_SET_TIME, command_string);
-            return Promise.resolve(true);
+            // Create a buffer for the command
+            const commandBuffer = Buffer.alloc(32);
+
+            // Encode the time and write it to the buffer
+            commandBuffer.writeUInt32LE(timeParser.encode(new Date(tm)), 0);
+
+            // Send the command to set the time
+            await this.executeCmd(COMMANDS.CMD_SET_TIME, commandBuffer);
+
+            // Indicate success
+            return true;
         } catch (err) {
-            return Promise.reject(err);
+            // Log and propagate the error
+            console.error('Error setting time:', err);
+            throw err; // Re-throw the error to allow it to be handled by the caller
         }
     }
 
+
     async clearAttendanceLog() {
-        return await this.executeCmd(COMMANDS.CMD_CLEAR_ATTLOG, '')
+        try {
+            // Execute command to clear attendance log
+            return await this.executeCmd(COMMANDS.CMD_CLEAR_ATTLOG, Buffer.alloc(0));
+        } catch (err) {
+            // Log and propagate the error
+            console.error('Error clearing attendance log:', err);
+            throw err; // Re-throw the error to allow it to be handled by the caller
+        }
     }
 
     async clearData() {
-        return await this.executeCmd(COMMANDS.CMD_CLEAR_DATA, '')
+        try {
+            // Execute command to clear data
+            return await this.executeCmd(COMMANDS.CMD_CLEAR_DATA, Buffer.alloc(0));
+        } catch (err) {
+            // Log and propagate the error
+            console.error('Error clearing data:', err);
+            throw err; // Re-throw the error to allow it to be handled by the caller
+        }
     }
 
     async disableDevice() {
-        return await this.executeCmd(COMMANDS.CMD_DISABLEDEVICE, REQUEST_DATA.DISABLE_DEVICE)
+        try {
+            // Execute command to disable the device with required data
+            return await this.executeCmd(COMMANDS.CMD_DISABLEDEVICE, REQUEST_DATA.DISABLE_DEVICE);
+        } catch (err) {
+            // Log and propagate the error
+            console.error('Error disabling device:', err);
+            throw err; // Re-throw the error to allow it to be handled by the caller
+        }
     }
 
     async enableDevice() {
-        return await this.executeCmd(COMMANDS.CMD_ENABLEDEVICE, '')
+        try {
+            // Execute command to enable the device
+            return await this.executeCmd(COMMANDS.CMD_ENABLEDEVICE, Buffer.alloc(0));
+        } catch (err) {
+            // Log and propagate the error
+            console.error('Error enabling device:', err);
+            throw err; // Re-throw the error to allow it to be handled by the caller
+        }
     }
+
 
     async disconnect() {
         try {
-            await this.executeCmd(COMMANDS.CMD_EXIT, '')
+            // Attempt to send the disconnect command
+            await this.executeCmd(COMMANDS.CMD_EXIT, Buffer.alloc(0));
         } catch (err) {
+            // Log the error if the command fails
+            console.error('Error executing disconnect command:', err);
+            // Optionally, you can handle the error or clean up here
         }
-        return await this.closeSocket()
+
+        // Ensure the socket is closed
+        try {
+            await this.closeSocket();
+        } catch (err) {
+            // Log the error if closing the socket fails
+            console.error('Error closing the socket:', err);
+            // Optionally, you can handle the error or clean up here
+        }
     }
 
 
-    async getRealTimeLogs(cb = () => {
-    }) {
+    async getRealTimeLogs(cb = () => {}) {
+        // Increment replyId
         this.replyId++;
-        const buf = createUDPHeader(COMMANDS.CMD_REG_EVENT, this.sessionId, this.replyId, REQUEST_DATA.GET_REAL_TIME_EVENT)
 
-        this.socket.send(buf, 0, buf.length, this.port, this.ip, (err) => {
+        // Create the UDP header with the command and data
+        const buf = createUDPHeader(COMMANDS.CMD_REG_EVENT, this.sessionId, this.replyId, REQUEST_DATA.GET_REAL_TIME_EVENT);
 
-        })
+        // Send the command via the socket
+        try {
+            this.socket.send(buf, 0, buf.length, this.port, this.ip, (err) => {
+                if (err) {
+                    console.error('Error sending UDP message:', err);
+                    return;
+                }
+                console.log('UDP message sent successfully');
+            });
+        } catch (err) {
+            console.error('Error during send operation:', err);
+            return; // Early return if sending fails
+        }
 
-        this.socket.listenerCount('message') < 2 && this.socket.on('message', (data) => {
-
+        // Add a single listener for the 'message' event
+        const handleMessage = (data) => {
             if (!checkNotEventUDP(data)) return;
-            if (data.length === 18) {
-                cb(decodeRecordRealTimeLog18(data))
-            }
-        })
 
+            if (data.length === 18) {
+                cb(decodeRecordRealTimeLog18(data));
+            }
+        };
+
+        if (this.socket.listenerCount('message') === 0) {
+            this.socket.on('message', handleMessage);
+        } else {
+            // Optionally handle the case where multiple listeners are not allowed
+            console.warn('Multiple message listeners detected. Ensure only one listener is attached.');
+        }
     }
+
 }
 
 

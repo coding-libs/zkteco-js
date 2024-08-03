@@ -22,113 +22,111 @@ class ZktecoJs {
     }
 
     async functionWrapper(tcpCallback, udpCallback, command) {
-        switch (this.connectionType) {
-            case 'tcp':
-                if (this.ztcp.socket) {
-                    try {
-                        const res = await tcpCallback()
-                        return res
-                    } catch (err) {
-                        return Promise.reject(new ZkError(
-                            err,
+        try {
+            switch (this.connectionType) {
+                case 'tcp':
+                    if (this.ztcp && this.ztcp.socket) {
+                        return await tcpCallback();
+                    } else {
+                        throw new ZkError(
+                            new Error(`TCP socket isn't connected!`),
                             `[TCP] ${command}`,
                             this.ip
-                        ))
+                        );
                     }
 
-                } else {
-                    return Promise.reject(new ZkError(
-                        new Error(`Socket isn't connected !`),
-                        `[TCP]`,
-                        this.ip
-                    ))
-                }
-            case 'udp':
-                if (this.zudp.socket) {
-                    try {
-                        const res = await udpCallback()
-                        return res
-                    } catch (err) {
-                        return Promise.reject(new ZkError(
-                            err,
+                case 'udp':
+                    if (this.zudp && this.zudp.socket) {
+                        return await udpCallback();
+                    } else {
+                        throw new ZkError(
+                            new Error(`UDP socket isn't connected!`),
                             `[UDP] ${command}`,
                             this.ip
-                        ))
+                        );
                     }
-                } else {
-                    return Promise.reject(new ZkError(
-                        new Error(`Socket isn't connected !`),
-                        `[UDP]`,
+
+                default:
+                    throw new ZkError(
+                        new Error(`Unsupported connection type or socket isn't connected!`),
+                        '',
                         this.ip
-                    ))
-                }
-            default:
-                return Promise.reject(new ZkError(
-                    new Error(`Socket isn't connected !`),
-                    '',
-                    this.ip
-                ))
+                    );
+            }
+        } catch (err) {
+            // Wrap the error in a ZkError and include context
+            throw new ZkError(
+                err,
+                `[${this.connectionType.toUpperCase()}] ${command}`,
+                this.ip
+            );
         }
     }
 
     async createSocket(cbErr, cbClose) {
         try {
-            if (!this.ztcp.socket) {
-                try {
-                    await this.ztcp.createSocket(cbErr, cbClose);
-                } catch (err) {
-                    throw err;
-                }
-
+            if (this.ztcp.socket) {
+                // If TCP socket already exists, try to connect
                 try {
                     await this.ztcp.connect();
-                    console.log('ok tcp');
+                    console.log('TCP connection successful');
                     this.connectionType = 'tcp';
                     return true; // Return true if TCP connection is successful
                 } catch (err) {
-                    throw err;
+                    throw new ZkError(err, 'TCP CONNECT', this.ip);
+                }
+            } else {
+                // Attempt to create and connect TCP socket
+                try {
+                    await this.ztcp.createSocket(cbErr, cbClose);
+                    await this.ztcp.connect();
+                    console.log('TCP connection successful');
+                    this.connectionType = 'tcp';
+                    return true; // Return true if TCP connection is successful
+                } catch (err) {
+                    throw new ZkError(err, 'TCP CONNECT', this.ip);
                 }
             }
         } catch (err) {
+            // Attempt to disconnect TCP if there was an error
             try {
-                await this.ztcp.disconnect();
-            } catch (err) {
+                if (this.ztcp.socket) await this.ztcp.disconnect();
+            } catch (disconnectErr) {
+                // Log or handle disconnection error if needed
             }
 
             if (err.code !== ERROR_TYPES.ECONNREFUSED) {
                 return Promise.reject(new ZkError(err, 'TCP CONNECT', this.ip));
             }
 
+            // Try to establish UDP connection if TCP fails
             try {
                 if (!this.zudp.socket) {
                     await this.zudp.createSocket(cbErr, cbClose);
-                    await this.zudp.connect();
                 }
-
-                console.log('ok udp');
+                await this.zudp.connect();
+                console.log('UDP connection successful');
                 this.connectionType = 'udp';
                 return true; // Return true if UDP connection is successful
             } catch (err) {
+                // Handle UDP connection error
                 if (err.code !== 'EADDRINUSE') {
                     this.connectionType = null;
                     try {
                         await this.zudp.disconnect();
-                        this.zudp.socket = null;
-                        this.ztcp.socket = null;
-                    } catch (err) {
+                    } catch (disconnectErr) {
+                        // Log or handle disconnection error if needed
                     }
-
                     return Promise.reject(new ZkError(err, 'UDP CONNECT', this.ip));
-                } else {
-                    this.connectionType = 'udp';
-                    return true; // Return true if UDP connection is successful after handling EADDRINUSE error
                 }
+
+                // Handle EADDRINUSE specifically
+                this.connectionType = 'udp';
+                return true; // Return true if UDP connection is successful after handling EADDRINUSE error
             }
         }
-
-        // Return false if no connection could be made
-        return false;
     }
+
 
     async getUsers() {
         return await this.functionWrapper(
@@ -242,20 +240,6 @@ class ZktecoJs {
         )
     }
 
-    async getRawAttendLog(cb) {
-        return await this.functionWrapper(
-            () => this.ztcp.getRawAttendLog(cb),
-            () => this.zudp.getRawAttendLog(cb),
-        )
-    }
-
-    async readAttendLogs(cb) {
-        return await this.functionWrapper(
-            () => this.ztcp.readAttendLogs(cb),
-            () => this.zudp.readAttendLogs(cb),
-        )
-    }
-
     async getRealTimeLogs(cb) {
         return await this.functionWrapper(
             () => this.ztcp.getRealTimeLogs(cb),
@@ -267,6 +251,13 @@ class ZktecoJs {
         return await this.functionWrapper(
             () => this.ztcp.disconnect(),
             () => this.zudp.disconnect()
+        )
+    }
+
+    async connect() {
+        return await this.functionWrapper(
+            () => this.ztcp.connect(),
+            () => this.zudp.connect()
         )
     }
 
