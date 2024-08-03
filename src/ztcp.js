@@ -677,6 +677,7 @@ class ZTCP {
 
     async setUser(uid, userid, name, password, role = 0, cardno = 0) {
         try {
+            
             if (
                 parseInt(uid) === 0 ||
                 parseInt(uid) > 3000 ||
