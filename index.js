@@ -151,6 +151,12 @@ class ZktecoJs {
         )
     }
 
+    async voiceTest() {
+        return await this.functionWrapper(
+            () => this.ztcp.voiceTest()
+        )
+    }
+
     async getSerialNumber() {
         return await this.functionWrapper(
             () => this.ztcp.getSerialNumber()

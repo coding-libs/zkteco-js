@@ -4,32 +4,43 @@
  * Date: 2024-07-01
  */
 
-const Zkteco = require("zkteco-js");
+const Zkteco = require("../index");
+
 const test = async () => {
-
-
-    let zkInstance = new Zkteco('10.20.0.6', 4370, 10000, 4000);
+    let zkInstance;
     try {
-        // Create socket to machine 
-        await zkInstance.createSocket()
+        // Create an instance of Zkteco with hard-coded values
+        zkInstance = new Zkteco('192.168.0.207', 4370, 10000, 4000);
 
+        // Create socket to machine
+        await zkInstance.createSocket();
 
         // Get general info like logCapacity, user counts, logs count
-        // It's really useful to check the status of device 
-        console.log(await zkInstance.getInfo())
+        const capacityInfo = await zkInstance.getInfo();
+
+        // Get attendances and users
+        const attendances = await zkInstance.getAttendances();
+
+        const users = await zkInstance.getUsers();
+
+        await zkInstance.voiceTest();
+
     } catch (e) {
+        // Log the error for debugging
+        console.error('An error occurred:', e);
+    } finally {
+        // Ensure the socket is closed
+        if (zkInstance) {
+            try {
+                await zkInstance.disconnect();
+            } catch (closeError) {
+                console.error('Error closing the socket:', closeError);
+            }
+        }
     }
-
-    // Disconnect the machine ( don't do this when you need realtime update :))) 
-    // const users = await zkInstance.getUsers();
-    // console.log(users.data.length);
-
-    const attendences = await zkInstance.getAttendances();
-    console.log(attendences.data);
-
-    const users = await zkInstance.getUsers();
-    console.log(users.data)
-
 }
 
-test()
+test().catch(err => {
+    // Handle any uncaught errors from the test function
+    console.error('Unhandled error in test function:', err);
+});

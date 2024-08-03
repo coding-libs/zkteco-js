@@ -667,6 +667,14 @@ class ZTCP {
         }
     }
 
+    async voiceTest(){
+        try {
+            return await this.executeCmd(COMMANDS.CMD_TESTVOICE, '\x00\x00')
+        } catch (err) {
+            return Promise.reject(err);
+        }
+    }
+
     async setUser(uid, userid, name, password, role = 0, cardno = 0) {
         try {
             if (
