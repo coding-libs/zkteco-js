@@ -151,13 +151,13 @@ module.exports.decodeUserData72 = (userData) => {
 
 module.exports.decodeRecordData40 = (recordData) => {
     const record = {
-        userSn: recordData.readUIntLE(0, 2),
-        deviceUserId: recordData
+        sn: recordData.readUIntLE(0, 2),
+        user_id: recordData
             .slice(2, 2 + 9)
             .toString('ascii')
             .split('\0')
             .shift(),
-        recordTime: parseTimeToDate(recordData.readUInt32LE(27)).toString(),
+        record_time: parseTimeToDate(recordData.readUInt32LE(27)).toString(),
         type: recordData.readUIntLE(26, 1),
         state: recordData.readUIntLE(31, 1),
     }
@@ -166,7 +166,7 @@ module.exports.decodeRecordData40 = (recordData) => {
 
 module.exports.decodeRecordData16 = (recordData) => {
     const record = {
-        deviceUserId: recordData.readUIntLE(0, 2), recordTime: parseTimeToDate(recordData.readUInt32LE(4))
+        user_id: recordData.readUIntLE(0, 2), record_time: parseTimeToDate(recordData.readUInt32LE(4))
     }
     return record
 }

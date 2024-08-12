@@ -69,7 +69,7 @@ class ZktecoJs {
                 // If TCP socket already exists, try to connect
                 try {
                     await this.ztcp.connect();
-                    console.log('TCP connection successful');
+                    console.log('TCP reconnection successful');
                     this.connectionType = 'tcp';
                     return true; // Return true if TCP connection is successful
                 } catch (err) {
