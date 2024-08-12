@@ -113,26 +113,34 @@ module.exports.removeTcpHeader = removeTcpHeader
 
 module.exports.decodeUserData28 = (userData) => {
     const user = {
-        uid: userData.readUIntLE(0, 2), role: userData.readUIntLE(2, 1), name: userData
+        uid: userData.readUIntLE(0, 2),
+        role: userData.readUIntLE(2, 1),
+        name: userData
             .slice(8, 8 + 8)
             .toString('ascii')
             .split('\0')
-            .shift(), userId: userData.readUIntLE(24, 4)
+            .shift(),
+        userId: userData.readUIntLE(24, 4)
     };
     return user;
 }
 
 module.exports.decodeUserData72 = (userData) => {
     const user = {
-        uid: userData.readUIntLE(0, 2), role: userData.readUIntLE(2, 1), password: userData
+        uid: userData.readUIntLE(0, 2),
+        role: userData.readUIntLE(2, 1),
+        password: userData
             .subarray(3, 3 + 8)
             .toString('ascii')
             .split('\0')
-            .shift(), name: userData
+            .shift(),
+        name: userData
             .slice(11)
             .toString('ascii')
             .split('\0')
-            .shift(), cardno: userData.readUIntLE(35, 4), userId: userData
+            .shift(),
+        cardno: userData.readUIntLE(35, 4),
+        userId: userData
             .slice(48, 48 + 9)
             .toString('ascii')
             .split('\0')
@@ -143,11 +151,15 @@ module.exports.decodeUserData72 = (userData) => {
 
 module.exports.decodeRecordData40 = (recordData) => {
     const record = {
-        userSn: recordData.readUIntLE(0, 2), deviceUserId: recordData
+        userSn: recordData.readUIntLE(0, 2),
+        deviceUserId: recordData
             .slice(2, 2 + 9)
             .toString('ascii')
             .split('\0')
-            .shift(), recordTime: parseTimeToDate(recordData.readUInt32LE(27)).toString(),
+            .shift(),
+        recordTime: parseTimeToDate(recordData.readUInt32LE(27)).toString(),
+        type: recordData.readUIntLE(26, 1),
+        state: recordData.readUIntLE(31, 1),
     }
     return record
 }

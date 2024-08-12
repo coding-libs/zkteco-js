@@ -10,7 +10,7 @@ const test = async () => {
     let zkInstance;
     try {
         // Create an instance of Zkteco with hard-coded values
-        zkInstance = new Zkteco('192.168.0.207', 4370, 10000, 4000);
+        zkInstance = new Zkteco('192.168.86.23', 4370, 10000, 4000);
         // Create socket to machine
         await zkInstance.createSocket();
 
