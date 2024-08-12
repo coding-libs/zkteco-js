@@ -597,6 +597,75 @@ class ZTCP {
     }
 
 
+    async getVendor() {
+        const keyword = '~OEMVendor';
+
+        try {
+            // Execute the command to get serial number
+            const data = await this.executeCmd(COMMANDS.CMD_OPTIONS_RRQ, keyword);
+
+            // Extract and format the serial number from the response data
+            const vendor = data.slice(8) // Skip the first 8 bytes (header)
+                .toString('ascii')              // Convert buffer to string
+                .replace(`${keyword}=`, '')     // Remove the keyword prefix
+                .replace(/\u0000/g, '');        // Remove null characters
+
+            return vendor;
+        } catch (err) {
+            // Log the error for debugging
+            console.error('Error getting vendor:', err);
+            // Re-throw the error for higher-level handling
+            throw err;
+        }
+    }
+
+
+    async getProductTime() {
+        const keyword = '~ProductTime';
+
+        try {
+            // Execute the command to get serial number
+            const data = await this.executeCmd(COMMANDS.CMD_OPTIONS_RRQ, keyword);
+
+            // Extract and format the serial number from the response data
+            const ProductTime = data.slice(8) // Skip the first 8 bytes (header)
+                .toString('ascii')              // Convert buffer to string
+                .replace(`${keyword}=`, '')     // Remove the keyword prefix
+                .replace(/\u0000/g, '');        // Remove null characters
+
+            return new Date(ProductTime);
+
+        } catch (err) {
+            // Log the error for debugging
+            console.error('Error getting Product Time:', err);
+            // Re-throw the error for higher-level handling
+            throw err;
+        }
+    }
+
+    async getMacAddress() {
+        const keyword = 'MAC';
+
+        try {
+            // Execute the command to get serial number
+            const data = await this.executeCmd(COMMANDS.CMD_OPTIONS_RRQ, keyword);
+
+            // Extract and format the serial number from the response data
+            const macAddr = data.slice(8) // Skip the first 8 bytes (header)
+                .toString('ascii')              // Convert buffer to string
+                .replace(`${keyword}=`, '')     // Remove the keyword prefix
+                .replace(/\u0000/g, '');        // Remove null characters
+
+            return macAddr;
+        } catch (err) {
+            // Log the error for debugging
+            console.error('Error getting MAC address:', err);
+            // Re-throw the error for higher-level handling
+            throw err;
+        }
+    }
+
+
     async getSerialNumber() {
         const keyword = '~SerialNumber';
 

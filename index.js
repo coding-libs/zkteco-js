@@ -155,6 +155,24 @@ class ZktecoJs {
         )
     }
 
+    async getProductTime() {
+        return await this.functionWrapper(
+            () => this.ztcp.getProductTime()
+        )
+    }
+
+    async getVendor() {
+        return await this.functionWrapper(
+            () => this.ztcp.getVendor()
+        )
+    }
+
+    async getMacAddress() {
+        return await this.functionWrapper(
+            () => this.ztcp.getMacAddress()
+        )
+    }
+
     async getSerialNumber() {
         return await this.functionWrapper(
             () => this.ztcp.getSerialNumber()

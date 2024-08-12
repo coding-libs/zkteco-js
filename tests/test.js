@@ -18,6 +18,15 @@ const test = async () => {
         const getInfo = await zkInstance.getInfo();
         console.log("getInfo: ", getInfo);
 
+        const getVendor = await zkInstance.getVendor();
+        console.log('getVendor: '+getVendor);
+
+        const getProductTime = await zkInstance.getProductTime();
+        console.log('getProductTime: '+getProductTime);
+
+        const getMacAddress = await zkInstance.getMacAddress();
+        console.log('getMacAddress: '+getMacAddress);
+
         const serialNo = await zkInstance.getSerialNumber();
         console.log('getSerialNumber: '+serialNo);
 

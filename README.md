@@ -76,6 +76,9 @@ manageZktecoDevice();
 - `disconnect()` - Disconnects the device from the network.
 - <span style="color: green; font-weight: bold;">🆕 `clearData()` - Clear All Data from the device (all users,attendances logs etc ).</span>
 - <span style="color: green; font-weight: bold;">🆕 `voiceTest()` - Voice Test.</span>
+- <span style="color: green; font-weight: bold;">🆕 `getVendor()` - get vendor name.</span>
+- <span style="color: green; font-weight: bold;">🆕 `getProductTime()` - get product created time.</span>
+- <span style="color: green; font-weight: bold;">🆕 `getMacAddress()` - get device MAC address.</span>
 
 ## Contributing
 
