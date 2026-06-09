@@ -24,10 +24,14 @@ const {log} = require('./logs/log')
 const {error} = require('console')
 
 class ZTCP {
-    constructor(ip, port, timeout) {
+    constructor(ip, port, timeout, maxChunk) {
         this.ip = ip;
         this.port = port;
         this.timeout = timeout;
+        // Size in bytes each bulk download is sliced into. Defaults to MAX_CHUNK
+        // (65472). A smaller value makes each chunk request individually more
+        // robust over slow/high-latency links where large chunks stall.
+        this.maxChunk = maxChunk || MAX_CHUNK;
         this.sessionId = null;
         this.replyId = 0;
         this.socket = null;
@@ -346,8 +350,9 @@ class ZTCP {
 
                     // We need to split the data to many chunks to receive , because it's to large
                     // After receiving all chunk data , we concat it to TotalBuffer variable , that 's the data we want
-                    let remain = size % MAX_CHUNK
-                    let numberChunks = Math.round(size - remain) / MAX_CHUNK
+                    const maxChunk = this.maxChunk || MAX_CHUNK
+                    let remain = size % maxChunk
+                    let numberChunks = Math.round(size - remain) / maxChunk
                     let totalPackets = numberChunks + (remain > 0 ? 1 : 0)
                     let replyData = Buffer.from([])
 
@@ -356,7 +361,9 @@ class ZTCP {
                     let realTotalBuffer = Buffer.from([])
 
 
-                    const timeout = 10000
+                    // Respect the configured timeout instead of a hardcoded 10s, so
+                    // slow/high-latency links can allow more time between packets.
+                    const timeout = this.timeout || 10000
                     let timer = setTimeout(() => {
                         internalCallback(replyData, new Error('TIMEOUT WHEN RECEIVING PACKET'))
                     }, timeout)
@@ -386,7 +393,7 @@ class ZTCP {
                             realTotalBuffer = Buffer.concat([realTotalBuffer, totalBuffer.subarray(16, 8 + packetLength)])
                             totalBuffer = totalBuffer.subarray(8 + packetLength)
 
-                            if ((totalPackets > 1 && realTotalBuffer.length === MAX_CHUNK + 8)
+                            if ((totalPackets > 1 && realTotalBuffer.length === maxChunk + 8)
                                 || (totalPackets === 1 && realTotalBuffer.length === remain + 8)) {
 
                                 replyData = Buffer.concat([replyData, realTotalBuffer.subarray(8)])
@@ -398,9 +405,30 @@ class ZTCP {
 
                                 if (totalPackets <= 0) {
                                     internalCallback(replyData)
+                                } else {
+                                    // This chunk is complete — request the next one.
+                                    requestNextChunk()
                                 }
                             }
                         }
+                    }
+
+                    // Request chunks sequentially: ask for one chunk, wait for it to
+                    // fully arrive, then ask for the next. Firing every chunk request
+                    // up front works on a LAN but stalls over a slow/high-latency
+                    // (WAN) link after a couple of chunks, because the device's send
+                    // buffer fills faster than the link drains it and the remaining
+                    // chunks never arrive — truncating the download. One chunk in
+                    // flight at a time lets the slow link keep up.
+                    let nextChunk = 0
+                    const requestNextChunk = () => {
+                        if (nextChunk > numberChunks) return
+                        if (nextChunk === numberChunks) {
+                            this.sendChunkRequest(numberChunks * maxChunk, remain)
+                        } else {
+                            this.sendChunkRequest(nextChunk * maxChunk, maxChunk)
+                        }
+                        nextChunk++
                     }
 
                     this.socket.once('close', () => {
@@ -409,13 +437,7 @@ class ZTCP {
 
                     this.socket.on('data', handleOnData);
 
-                    for (let i = 0; i <= numberChunks; i++) {
-                        if (i === numberChunks) {
-                            this.sendChunkRequest(numberChunks * MAX_CHUNK, remain)
-                        } else {
-                            this.sendChunkRequest(i * MAX_CHUNK, MAX_CHUNK)
-                        }
-                    }
+                    requestNextChunk()
 
                     break;
                 }

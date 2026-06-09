@@ -10,10 +10,13 @@ const ZUDP = require('./src/zudp')
 const {ZkError, ERROR_TYPES} = require('./src/exceptions/handler')
 
 class ZktecoJs {
-    constructor(ip, port, timeout, inport) {
+    constructor(ip, port, timeout, inport, maxChunk) {
         this.connectionType = null
 
-        this.ztcp = new ZTCP(ip, port, timeout)
+        // maxChunk (optional) — size in bytes each bulk download is sliced into.
+        // Defaults to 65472. Lower it (e.g. 8184) for slow/high-latency/WAN links
+        // where the device stalls partway through a large attendance download.
+        this.ztcp = new ZTCP(ip, port, timeout, maxChunk)
         this.zudp = new ZUDP(ip, port, timeout, inport)
         this.interval = null
         this.timer = null
